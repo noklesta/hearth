@@ -1,46 +1,80 @@
-window.Hearth = Ember.Namespace.create({
+//= require hearth/keyboard
 
-  // Keyboard shortcuts. You can override these in your own JavaScript code at
-  // any time. (I use modifier keys for all shortcuts to avoid conflict with
-  // the Vimium extension for Chrome - you might not need that.)
-  KEYS: {
-    activate: {
-      key:  'e',
-      ctrl: true,
-      alt:  true
-    },
+$(function() {
+  // Handle keyboard events. Attaching the handler to document.documentElement
+  // makes it work across all browsers
+  // (see http://jqueryfordesigners.com/adding-keyboard-navigation/).
+  $(document.documentElement).on('keydown', function(e) {
+    var key = Hearth.getHotkey('activate');
 
-    editView: {
-      key: 'v',
-      ctrl: true
-    },
-
-    editTemplate: {
-      key: 't',
-      ctrl: true
-    },
-
-    showParentView: {
-      key: 'p',
-      ctrl: true
-    },
-
-    showChildViews: {
-      key: 'c',
-      ctrl: true
+    if(e.which === key.keyCode &&
+      key.ctrl == e.ctrlKey && key.alt == e.altKey && key.shift == e.shiftKey) {
+      Hearth.activate();
     }
+  });
+});
+
+Hearth.reopen({
+  activate: function() {
+    alert('bbb');
+    if(this.bodyOverlay) return;
+
+    this._createBodyOverlay();
+    this._createViewOverlays();
+    this._setupEventHandlers();
   },
 
-  // Translates the info for a keyboard shortcut from the human-friendly format
-  // in KEYS to a format that is more conventient for the program.
-  getHotkey: function(task) {
-    var hotkey = Hearth.KEYS[task];
-    return {
-         keyCode: hotkey.key.toUpperCase().charCodeAt(),
-         ctrl:    !!hotkey.ctrl,
-         alt:     !!hotkey.alt,
-         shift:   !!hotkey.shift
-       };
-   }
+  deactivate: function() {
+    this._removeEventHandlers();
+    this._destroyViewOverlays();
+    this._destroyBodyOverlay();
+  },
 
+  // Private methods
+
+  _createBodyOverlay: function() {
+    this.bodyOverlay = $('<div/>').addClass('ee-body-overlay').appendTo('body');
+  },
+
+  _createViewOverlays: function() {
+    // Ember.View.views is an object that contains those views that currently
+    // exist in the DOM (excluding, for instance, views inside an #if block that
+    // currently evaluates to false). So, in order to highlight the currently
+    // displayed views, we get the Ember.View.views object each time we activate
+    // the tl_ember_edit functionality.
+    this.views = Ember.View.views;
+
+    var views = this.views;
+    this.viewOverlays = $.map($('.ember-view[id]'), function(elm) {
+      var obj = Hearth.ViewOverlay.create({
+        emberViewElm: $(elm),
+        emberView: views[elm.id]
+      });
+    });
+  },
+
+  _setupEventHandlers: function() {
+    this.bodyOverlay.on('mouseover', '.ee-view-overlay', Hearth.ViewOverlay.onMouseOver);
+    this.bodyOverlay.on('mouseout',  '.ee-view-overlay', Hearth.ViewOverlay.onMouseOut);
+
+    $(document.documentElement).on('keydown', $.proxy(this._keyEventHandler, this));
+  },
+
+  _keyEventHandler: function(e) {
+    var i, tasks = ['editView', 'editTemplate', 'showParentView', 'showChildViews'],
+        tasksLength = tasks.length, task, key, view;
+
+    for(i = 0; i < tasksLength; i++) {
+      task = tasks[i];
+      key = Hearth.getHotkey(task);
+
+      if(e.which === key.keyCode &&
+        key.ctrl == e.ctrlKey && key.alt == e.altKey && key.shift == e.shiftKey) {
+        view = Hearth.ViewOverlay.selectedView;
+      if(view) {
+        view[task]();
+      }
+    }
+  }
+}
 });
