@@ -15,3 +15,11 @@ gem "jquery-rails"
 
 # To use debugger
 # gem 'debugger'
+
+group :development do
+  gem 'thin'
+  gem 'pry'
+  gem 'pry-doc'
+
+  gem 'bullet'
+end
